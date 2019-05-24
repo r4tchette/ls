@@ -11,20 +11,24 @@ void printTime(time_t time){
 	struct tm *date = localtime(&time);
 	//printf(" %s ", asctime(date));
 	printf("%d-", date->tm_year+1900);
-	printf("%d-", date->tm_mon+1);
-	printf("%d ", date->tm_mday);
-	printf("%d:", date->tm_hour); 
-	printf("%d\t", date->tm_min);
+	if(date->tm_mon+1 < 10) printf("0%d-", date->tm_mon+1);
+	else printf("%d-", date->tm_mon+1);
+	if(date->tm_mday < 10) printf("0%d ", date->tm_mday);
+	else printf("%d ", date->tm_mday);
+	if(date->tm_hour < 10) printf("0%d:", date->tm_hour);
+	else printf("%d:", date->tm_hour);
+	if(date->tm_min < 10) printf("0%d ", date->tm_min);
+	else printf("%d ", date->tm_min);
 }
 
 void printGroup(gid_t gid){
 	struct group *gr = getgrgid(gid);
-	printf("%s\t", gr->gr_name);
+	printf("%s ", gr->gr_name);
 }
 
 void printUser(uid_t uid){
 	struct passwd *pw = getpwuid(uid);
-	printf("%s\t", pw->pw_name);
+	printf("%s ", pw->pw_name);
 }
 
 // "mode_t" is the type of stat.st_mode
@@ -62,7 +66,7 @@ void myls(char *path){
 		printUser(info.st_uid); //owner user
 		//printf("[%10d] ", info.st_gid); //owner group
 		printGroup(info.st_gid); //owner group
-		printf("%d\t", info.st_size);//file size
+		printf("%d ", info.st_size);//file size
 		//printf("[%10d] ", info.st_mtime); //time of last modification
 		printTime(info.st_mtime); //time of last modification
 		printf("%s\n", ep->d_name);//file/directory name
