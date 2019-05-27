@@ -4,9 +4,13 @@
 #include <pwd.h> // for owner user name
 #include <grp.h> // for owner group name
 #include <time.h> // for time stat
-#include <malloc.h>
-#include <string.h>
+#include <malloc.h> // dynamic memory allocation
+#include <string.h> // using strcmp function for alpabetical sorting 
 
+// ANSI colors in terminal
+#define GREEN	"\x1b[1;32m" // executable file
+#define BLUE	"\x1b[1;34m" // directory
+#define WHITE	"\x1b[0;37m" // regular file
 
 // linked list structure for storing file info.
 typedef struct fileInfoList{
@@ -81,12 +85,13 @@ void printUser(uid_t uid){
 }
 
 // "mode_t" contains type and permission of file
-void printMode(mode_t mode){
+char printMode(mode_t mode){
+	char type = 'r';
 	// file type
 	switch(mode & S_IFMT){
 		case S_IFBLK:	printf("b"); break;
 		case S_IFCHR:	printf("c"); break;
-		case S_IFDIR:	printf("d"); break;
+		case S_IFDIR:	printf("d"); type = 'd'; break;
 		case S_IFIFO:	printf("p"); break;
 		case S_IFLNK:	printf("l"); break;
 		case S_IFREG:	printf("-"); break;
@@ -98,7 +103,11 @@ void printMode(mode_t mode){
 	// file permission
 	printf( (mode & S_IRUSR) ? "r" : "-" );
 	printf( (mode & S_IWUSR) ? "w" : "-" );
-	printf( (mode & S_IXUSR) ? "x" : "-" );
+//	printf( (mode & S_IXUSR) ? "x" : "-" );
+	if(mode & S_IXUSR){
+		printf("x");
+		if(type == 'r') type = 'e';
+	} else printf("-");
 	printf( (mode & S_IRGRP) ? "r" : "-" );
 	printf( (mode & S_IWGRP) ? "w" : "-" );
 	printf( (mode & S_IXGRP) ? "x" : "-" );
@@ -106,20 +115,26 @@ void printMode(mode_t mode){
 	printf( (mode & S_IWOTH) ? "w" : "-" );
 	printf( (mode & S_IXOTH) ? "x" : "-" );
 	printf(" ");
+
+	return type;
 }
 
 
 void printFileInfo(fileInfoList *node){
 //	node->dirEntry
 //	node->fileStat
-
-	printMode(node->fileStat->st_mode);	// file mode. type and permission
+	char type = printMode(node->fileStat->st_mode);	// file mode. type and permission
 	printf("%d ", node->fileStat->st_nlink);// number of links
 	printUser(node->fileStat->st_uid);	// owner user name
 	printGroup(node->fileStat->st_gid);	// owner group name
-	printf("%d ", node->fileStat->st_size);	// file size
+	printf("%10d\t", node->fileStat->st_size);	// file size
 	printTime(node->fileStat->st_mtime);	// time of last modification
+
+//	if(node->dirEntry->d_type == DT_DIR)
+	if(type == 'd') printf(BLUE);
+	else if(type == 'e') printf(GREEN);
 	printf("%s\n", node->dirEntry->d_name);	// file and directory name
+	printf(WHITE);
 }
 
 void myls(char *curPath){
