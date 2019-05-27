@@ -7,6 +7,38 @@
 #include <time.h> // for time stat
 
 
+// linked list structure for storing file info.
+typedef struct fileInfoList{
+	struct stat *fileStat;
+	struct dirent *directoryEntry;
+	struct fileInfoList *next;
+} fileInfoList;
+
+// append new node into linked list with alphabetical order
+int statListAppend(fileInfoList *curNode, fileInfoList *newNode){
+	if(curNode == NULL){
+	 	return 1;
+	} else{
+		fileInfoList *prevNode = NULL;
+		while(curNode != NULL){
+			if(strcmp(newNode->directoryEntry->d_name,
+				  curNode->directoryEntry->d_name) < 0){
+				if(prevNode != NULL){
+					prevNode->next = newNode;
+				}
+				appendNode->next = curNode;
+				prevNode == NULL;
+				return 0;
+			}
+			prevNode = curNode;
+			statNode = curNode->next;
+		}
+		prevNode->next = newNode;
+	}
+	return 1;
+}
+
+
 void printTime(time_t time){
 	struct tm *date = localtime(&time);
 	//printf(" %s ", asctime(date));
@@ -21,10 +53,12 @@ void printTime(time_t time){
 	else printf("%d ", date->tm_min);
 }
 
+
 void printGroup(gid_t gid){
 	struct group *gr = getgrgid(gid);
 	printf("%s ", gr->gr_name);
 }
+
 
 void printUser(uid_t uid){
 	struct passwd *pw = getpwuid(uid);
@@ -45,6 +79,7 @@ void printMode(mode_t mode){
 	printf( (mode & S_IXOTH) ? "x" : "-" );
 	printf(" ");
 }
+
 
 void myls(char *path){
 	DIR *dp;
@@ -73,6 +108,7 @@ void myls(char *path){
 	}
 	closedir(dp);
 }
+
 
 int main(){
 	myls(".");
