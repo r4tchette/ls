@@ -1,18 +1,33 @@
 #include <stdio.h> // standard input/output
 #include <dirent.h> // search directory
-//#include <unistd.h>
 #include <sys/stat.h> // for file stat
 #include <pwd.h> // for owner user name
 #include <grp.h> // for owner group name
 #include <time.h> // for time stat
+#include <malloc.h>
+#include <string.h>
 
 
 // linked list structure for storing file info.
 typedef struct fileInfoList{
 	struct stat *fileStat;
-	struct dirent *directoryEntry;
+	struct dirent *dirEntry;
 	struct fileInfoList *next;
 } fileInfoList;
+
+void freeAll(fileInfoList *node){
+	if(node != NULL){
+		freeAll(node->next);
+		free(node->fileStat);
+		free(node);
+	}
+}
+
+char* pathCombine(char* curPath, char* dirName){
+	char *newPath = (char*)malloc((strlen(curPath) + strlen(dirName) + 2) * sizeof(char));
+	sprintf(newPath, "%s/%s", curPath, dirName);
+	return newPath;
+}
 
 // append new node into linked list with alphabetical order
 int statListAppend(fileInfoList *curNode, fileInfoList *newNode){
@@ -21,17 +36,17 @@ int statListAppend(fileInfoList *curNode, fileInfoList *newNode){
 	} else{
 		fileInfoList *prevNode = NULL;
 		while(curNode != NULL){
-			if(strcmp(newNode->directoryEntry->d_name,
-				  curNode->directoryEntry->d_name) < 0){
+			if(strcmp(newNode->dirEntry->d_name,
+				  curNode->dirEntry->d_name) < 0){
 				if(prevNode != NULL){
 					prevNode->next = newNode;
 				}
-				appendNode->next = curNode;
-				prevNode == NULL;
-				return 0;
+				newNode->next = curNode;
+				if(prevNode == NULL) return 0;
+				else return 1;
 			}
 			prevNode = curNode;
-			statNode = curNode->next;
+			curNode = curNode->next;
 		}
 		prevNode->next = newNode;
 	}
@@ -65,9 +80,22 @@ void printUser(uid_t uid){
 	printf("%s ", pw->pw_name);
 }
 
-// "mode_t" is the type of stat.st_mode
+// "mode_t" contains type and permission of file
 void printMode(mode_t mode){
-	printf( (S_ISDIR(mode)) ? "d" : "-" );
+	// file type
+	switch(mode & S_IFMT){
+		case S_IFBLK:	printf("b"); break;
+		case S_IFCHR:	printf("c"); break;
+		case S_IFDIR:	printf("d"); break;
+		case S_IFIFO:	printf("p"); break;
+		case S_IFLNK:	printf("l"); break;
+		case S_IFREG:	printf("-"); break;
+		case S_IFSOCK:	printf("s"); break;
+		default:	printf("u"); break; // unknown type
+	}
+	//printf( (S_ISDIR(mode)) ? "d" : "-" );
+
+	// file permission
 	printf( (mode & S_IRUSR) ? "r" : "-" );
 	printf( (mode & S_IWUSR) ? "w" : "-" );
 	printf( (mode & S_IXUSR) ? "x" : "-" );
@@ -81,32 +109,74 @@ void printMode(mode_t mode){
 }
 
 
-void myls(char *path){
+void printFileInfo(fileInfoList *node){
+//	node->dirEntry
+//	node->fileStat
+
+	printMode(node->fileStat->st_mode);	// file mode. type and permission
+	printf("%d ", node->fileStat->st_nlink);// number of links
+	printUser(node->fileStat->st_uid);	// owner user name
+	printGroup(node->fileStat->st_gid);	// owner group name
+	printf("%d ", node->fileStat->st_size);	// file size
+	printTime(node->fileStat->st_mtime);	// time of last modification
+	printf("%s\n", node->dirEntry->d_name);	// file and directory name
+}
+
+void myls(char *curPath){
 	DIR *dp;
 	struct dirent *ep;
-	char *np;
-	struct stat info;
+	int total = 0;
+	fileInfoList *fileInfo = NULL;
 
-	dp = opendir(path);
-	while(1){
-		ep = readdir(dp);
-		stat(ep->d_name, &info); //
-		
-		if(ep == NULL) break;
+	printf("%s:\n", curPath);
+	dp = opendir(curPath);
+	if(dp){
+		while((ep = readdir(dp)) != NULL){
+			if(ep->d_name[0] == '.'){
+				continue;
+			}
+			struct stat *info = (struct stat *)malloc(sizeof(struct stat));
+			char *filePath = pathCombine(curPath, ep->d_name);
+			if(stat(filePath, info) == 0){
+				total += info->st_blocks;
 
-		//printf("[%10o] ", info.st_mode); //file permissions
-		printMode(info.st_mode);
-		printf("%d ", info.st_nlink); //number of links
-		//printf("[%10d] ", info.st_uid); //owner name
-		printUser(info.st_uid); //owner user
-		//printf("[%10d] ", info.st_gid); //owner group
-		printGroup(info.st_gid); //owner group
-		printf("%d ", info.st_size);//file size
-		//printf("[%10d] ", info.st_mtime); //time of last modification
-		printTime(info.st_mtime); //time of last modification
-		printf("%s\n", ep->d_name);//file/directory name
+				fileInfoList *newNode = (fileInfoList *) malloc(sizeof(fileInfoList));
+				newNode->fileStat = info;
+				newNode->dirEntry = ep;
+				newNode->next = NULL;
+
+				if(fileInfo == NULL){
+					fileInfo = newNode;
+				} else{
+					if(statListAppend(fileInfo, newNode) == 0){
+						fileInfo = newNode;
+					}
+				}
+			}
+			free(filePath);
+		}
+		printf("합계: %d\n", total/2);
+
+		if(fileInfo != NULL){
+			fileInfoList *loop = fileInfo;
+			while(loop != NULL){
+				printFileInfo(loop);
+				loop = loop->next;
+			}
+			loop = fileInfo;
+			while(loop != NULL){
+				if(loop->dirEntry->d_type == DT_DIR){
+					printf("\n");
+					char *nextPath = pathCombine(curPath, loop->dirEntry->d_name);
+					myls(nextPath);
+					free(nextPath);
+				}
+				loop = loop->next;
+			}
+		}
+		freeAll(fileInfo);
+		closedir(dp);
 	}
-	closedir(dp);
 }
 
 
