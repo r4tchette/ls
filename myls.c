@@ -9,6 +9,7 @@
 
 // ANSI colors in terminal
 #define GREEN	"\x1b[1;32m" // executable file
+#define LTBLUE	"\x1b[1;36m" // symbloic link file
 #define BLUE	"\x1b[1;34m" // directory
 #define WHITE	"\x1b[0;37m" // regular file
 
@@ -93,7 +94,7 @@ char printMode(mode_t mode){
 		case S_IFCHR:	printf("c"); break;
 		case S_IFDIR:	printf("d"); type = 'd'; break;
 		case S_IFIFO:	printf("p"); break;
-		case S_IFLNK:	printf("l"); break;
+		case S_IFLNK:	printf("l"); type = 'l'; break;
 		case S_IFREG:	printf("-"); break;
 		case S_IFSOCK:	printf("s"); break;
 		default:	printf("u"); break; // unknown type
@@ -131,9 +132,11 @@ void printFileInfo(fileInfoList *node){
 	printTime(node->fileStat->st_mtime);	// time of last modification
 
 //	if(node->dirEntry->d_type == DT_DIR)
-	if(type == 'd') printf(BLUE);
-	else if(type == 'e') printf(GREEN);
-	printf("%s\n", node->dirEntry->d_name);	// file and directory name
+	if(type == 'd') printf(BLUE);  // directory
+	else if(type == 'e') printf(GREEN); // executable ile
+	else if(type == 'l') printf(LTBLUE); // symbolic link file
+	//else printf(WHITE);
+	printf("%s", node->dirEntry->d_name);	// file and directory name
 	printf(WHITE);
 }
 
@@ -152,7 +155,7 @@ void myls(char *curPath){
 			}
 			struct stat *info = (struct stat *)malloc(sizeof(struct stat));
 			char *filePath = pathCombine(curPath, ep->d_name);
-			if(stat(filePath, info) == 0){
+			if(lstat(filePath, info) == 0){
 				total += info->st_blocks;
 
 				fileInfoList *newNode = (fileInfoList *) malloc(sizeof(fileInfoList));
@@ -176,6 +179,13 @@ void myls(char *curPath){
 			fileInfoList *loop = fileInfo;
 			while(loop != NULL){
 				printFileInfo(loop);
+				if(loop->dirEntry->d_type == DT_LNK){
+					char* nextPath = pathCombine(curPath, loop->dirEntry->d_name);
+					char buf[256];
+					readlink(nextPath, buf, sizeof(buf)-1);
+					printf(" -> %s", buf);
+				}
+				printf("\n");
 				loop = loop->next;
 			}
 			loop = fileInfo;
